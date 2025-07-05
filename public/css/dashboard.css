@@ -1,0 +1,23 @@
+/* public/css/dashboard.css - Estilos específicos do dashboard */
+
+/* Já está tudo incluído no style.css principal */
+/* Este arquivo pode ficar vazio ou ser removido do HTML */
+
+/* Animações extras para o dashboard */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+.stat-card:hover {
+    animation: pulse 0.3s ease-in-out;
+}
+
+/* Melhorias específicas do dashboard */
+.dashboard-grid {
+    display: grid;
+    gap: var(--spacing-lg);
+}
+
+/* Este arquivo é opcional - tudo já está no style.css */

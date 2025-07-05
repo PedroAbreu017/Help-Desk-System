@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Desk Pro - Sistema de Suporte</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Loading Spinner -->
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Carregando...</p>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-headset"></i>
+                <h1>Help Desk Pro</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn-refresh" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> Atualizar
+                </button>
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span>Suporte TI</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="sidebar">
+        <ul class="nav-menu">
+            <li class="nav-item active" data-section="dashboard">
+                <i class="fas fa-chart-dashboard"></i>
+                <span>Dashboard</span>
+            </li>
+            <li class="nav-item" data-section="tickets">
+                <i class="fas fa-ticket-alt"></i>
+                <span>Tickets</span>
+                <span class="badge" id="tickets-count">0</span>
+            </li>
+            <li class="nav-item" data-section="new-ticket">
+                <i class="fas fa-plus-circle"></i>
+                <span>Novo Ticket</span>
+            </li>
+            <li class="nav-item" data-section="reports">
+                <i class="fas fa-chart-bar"></i>
+                <span>Relatórios</span>
+            </li>
+            <li class="nav-item" data-section="knowledge-base">
+                <i class="fas fa-book"></i>
+                <span>Base de Conhecimento</span>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="content-section active">
+            <div class="section-header">
+                <h2><i class="fas fa-chart-dashboard"></i> Dashboard</h2>
+                <p>Visão geral do sistema de suporte</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card total">
+                    <div class="stat-icon"><i class="fas fa-ticket-alt"></i></div>
+                    <div class="stat-info">
+                        <h3 id="total-tickets">0</h3>
+                        <p>Total de Tickets</p>
+                    </div>
+                </div>
+                <div class="stat-card open">
+                    <div class="stat-icon"><i class="fas fa-folder-open"></i></div>
+                    <div class="stat-info">
+                        <h3 id="open-tickets">0</h3>
+                        <p>Tickets Abertos</p>
+                    </div>
+                </div>
+                <div class="stat-card progress">
+                    <div class="stat-icon"><i class="fas fa-cog"></i></div>
+                    <div class="stat-info">
+                        <h3 id="progress-tickets">0</h3>
+                        <p>Em Andamento</p>
+                    </div>
+                </div>
+                <div class="stat-card resolved">
+                    <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-info">
+                        <h3 id="resolved-tickets">0</h3>
+                        <p>Resolvidos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Priority and Category Charts -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Tickets por Prioridade</h3>
+                    <div class="priority-chart">
+                        <div class="priority-item critica">
+                            <span class="priority-label">Crítica</span>
+                            <div class="priority-bar">
+                                <div class="priority-fill" data-priority="critica"></div>
+                            </div>
+                            <span class="priority-count" id="priority-critica">0</span>
+                        </div>
+                        <div class="priority-item alta">
+                            <span class="priority-label">Alta</span>
+                            <div class="priority-bar">
+                                <div class="priority-fill" data-priority="alta"></div>
+                            </div>
+                            <span class="priority-count" id="priority-alta">0</span>
+                        </div>
+                        <div class="priority-item media">
+                            <span class="priority-label">Média</span>
+                            <div class="priority-bar">
+                                <div class="priority-fill" data-priority="media"></div>
+                            </div>
+                            <span class="priority-count" id="priority-media">0</span>
+                        </div>
+                        <div class="priority-item baixa">
+                            <span class="priority-label">Baixa</span>
+                            <div class="priority-bar">
+                                <div class="priority-fill" data-priority="baixa"></div>
+                            </div>
+                            <span class="priority-count" id="priority-baixa">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3><i class="fas fa-chart-pie"></i> Tickets por Categoria</h3>
+                    <div class="category-grid" id="category-chart">
+                        <!-- Categories will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Tickets -->
+            <div class="recent-tickets">
+                <h3><i class="fas fa-clock"></i> Tickets Recentes</h3>
+                <div class="tickets-list" id="recent-tickets">
+                    <!-- Recent tickets will be populated by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Tickets Section -->
+        <section id="tickets-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-ticket-alt"></i> Gerenciar Tickets</h2>
+                <p>Visualizar e gerenciar todos os tickets de suporte</p>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label for="filter-status">Status:</label>
+                    <select id="filter-status" class="filter-select">
+                        <option value="">Todos</option>
+                        <option value="aberto">Aberto</option>
+                        <option value="andamento">Em Andamento</option>
+                        <option value="resolvido">Resolvido</option>
+                        <option value="fechado">Fechado</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-priority">Prioridade:</label>
+                    <select id="filter-priority" class="filter-select">
+                        <option value="">Todas</option>
+                        <option value="critica">Crítica</option>
+                        <option value="alta">Alta</option>
+                        <option value="media">Média</option>
+                        <option value="baixa">Baixa</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-category">Categoria:</label>
+                    <select id="filter-category" class="filter-select">
+                        <option value="">Todas</option>
+                        <option value="hardware">Hardware</option>
+                        <option value="software">Software</option>
+                        <option value="rede">Rede</option>
+                        <option value="email">Email</option>
+                        <option value="impressora">Impressora</option>
+                        <option value="sistema">Sistema</option>
+                        <option value="acesso">Acesso</option>
+                    </select>
+                </div>
+                <button class="btn-filter" onclick="applyFilters()">
+                    <i class="fas fa-filter"></i> Filtrar
+                </button>
+                <button class="btn-clear" onclick="clearFilters()">
+                    <i class="fas fa-times"></i> Limpar
+                </button>
+            </div>
+
+            <!-- Tickets Table -->
+            <div class="tickets-table-container">
+                <table class="tickets-table" id="tickets-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>Usuário</th>
+                            <th>Categoria</th>
+                            <th>Prioridade</th>
+                            <th>Status</th>
+                            <th>Criado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tickets-tbody">
+                        <!-- Tickets will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination">
+                <!-- Pagination will be generated by JavaScript -->
+            </div>
+        </section>
+
+        <!-- New Ticket Section -->
+        <section id="new-ticket-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-plus-circle"></i> Criar Novo Ticket</h2>
+                <p>Abrir novo chamado de suporte técnico</p>
+            </div>
+
+            <div class="form-container">
+                <form id="new-ticket-form" class="ticket-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticket-title">Título do Problema *</label>
+                            <input type="text" id="ticket-title" name="title" required 
+                                   placeholder="Ex: Computador não liga">
+                        </div>
+                        <div class="form-group">
+                            <label for="ticket-category">Categoria *</label>
+                            <select id="ticket-category" name="category" required>
+                                <option value="">Selecione...</option>
+                                <option value="hardware">Hardware</option>
+                                <option value="software">Software</option>
+                                <option value="rede">Rede/Internet</option>
+                                <option value="email">Email</option>
+                                <option value="impressora">Impressora</option>
+                                <option value="sistema">Sistema Interno</option>
+                                <option value="acesso">Controle de Acesso</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticket-priority">Prioridade *</label>
+                            <select id="ticket-priority" name="priority" required>
+                                <option value="">Selecione...</option>
+                                <option value="baixa">Baixa - Não afeta trabalho</option>
+                                <option value="media">Média - Impacto moderado</option>
+                                <option value="alta">Alta - Impacto significativo</option>
+                                <option value="critica">Crítica - Sistema parado</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ticket-department">Departamento *</label>
+                            <select id="ticket-department" name="department" required>
+                                <option value="">Selecione...</option>
+                                <option value="Administração">Administração</option>
+                                <option value="Financeiro">Financeiro</option>
+                                <option value="Vendas">Vendas</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Produção">Produção</option>
+                                <option value="TI">Tecnologia da Informação</option>
+                                <option value="RH">Recursos Humanos</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticket-user-name">Nome do Usuário *</label>
+                            <input type="text" id="ticket-user-name" name="user_name" required 
+                                   placeholder="Nome completo">
+                        </div>
+                        <div class="form-group">
+                            <label for="ticket-user-email">Email do Usuário *</label>
+                            <input type="email" id="ticket-user-email" name="user_email" required 
+                                   placeholder="usuario@empresa.com">
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="ticket-description">Descrição Detalhada do Problema *</label>
+                        <textarea id="ticket-description" name="description" required rows="6"
+                                  placeholder="Descreva o problema com o máximo de detalhes possível. Inclua:
+- O que estava fazendo quando o problema ocorreu
+- Mensagens de erro (se houver)
+- Quando o problema começou
+- Se já tentou alguma solução"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-ticket-alt"></i> Criar Ticket
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i> Limpar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Reports Section -->
+        <section id="reports-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-chart-bar"></i> Relatórios</h2>
+                <p>Análises e métricas do sistema de suporte</p>
+            </div>
+
+            <div class="report-filters">
+                <div class="filter-group">
+                    <label for="report-start-date">Data Início:</label>
+                    <input type="date" id="report-start-date">
+                </div>
+                <div class="filter-group">
+                    <label for="report-end-date">Data Fim:</label>
+                    <input type="date" id="report-end-date">
+                </div>
+                <button class="btn btn-primary" onclick="generateReport()">
+                    <i class="fas fa-chart-line"></i> Gerar Relatório
+                </button>
+                <button class="btn btn-secondary" onclick="exportReport()">
+                    <i class="fas fa-download"></i> Exportar
+                </button>
+            </div>
+
+            <div id="report-content" class="report-content">
+                <!-- Report content will be populated by JavaScript -->
+            </div>
+        </section>
+
+        <!-- Knowledge Base Section -->
+        <section id="knowledge-base-section" class="content-section">
+            <div class="section-header">
+                <h2><i class="fas fa-book"></i> Base de Conhecimento</h2>
+                <p>Soluções para problemas comuns</p>
+            </div>
+
+            <div class="knowledge-base">
+                <div class="kb-search">
+                    <div class="search-group">
+                        <input type="text" id="kb-search" placeholder="Buscar por problema ou solução...">
+                        <button class="btn-search">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="kb-categories">
+                    <button class="kb-category active" data-category="all">Todos</button>
+                    <button class="kb-category" data-category="hardware">Hardware</button>
+                    <button class="kb-category" data-category="software">Software</button>
+                    <button class="kb-category" data-category="rede">Rede</button>
+                    <button class="kb-category" data-category="sistema">Sistema</button>
+                </div>
+
+                <div class="kb-articles" id="kb-articles">
+                    <!-- Knowledge base articles will be populated by JavaScript -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Ticket Details -->
+    <div id="ticket-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Detalhes do Ticket</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Ticket details will be populated by JavaScript -->
+            </div>
+            <div class="modal-footer" id="modal-footer">
+                <!-- Modal actions will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/tickets.js"></script>
+    <script src="js/reports.js"></script>
+    <script src="js/knowledge-base.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
