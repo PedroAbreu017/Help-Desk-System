@@ -420,7 +420,7 @@ const StorageUtils = {
     },
 
     /**
-     * Limpar localStorage expirado
+     * Limpar localStorage expirado - FUNÇÃO CORRIGIDA
      */
     clearExpired() {
         try {
@@ -429,9 +429,19 @@ const StorageUtils = {
                 if (key) {
                     const itemStr = localStorage.getItem(key);
                     if (itemStr) {
-                        const item = JSON.parse(itemStr);
-                        if (item.expiration && Date.now() > item.expiration) {
-                            localStorage.removeItem(key);
+                        try {
+                            // Verificar se o item é um JSON válido antes de tentar fazer parse
+                            if (itemStr.startsWith('{') && itemStr.endsWith('}')) {
+                                const item = JSON.parse(itemStr);
+                                // Só remover se tiver estrutura de expiração e estiver expirado
+                                if (item.expiration && Date.now() > item.expiration) {
+                                    localStorage.removeItem(key);
+                                }
+                            }
+                            // Se não for JSON válido (como tokens JWT), ignorar silenciosamente
+                        } catch (parseError) {
+                            // Item não é JSON válido (pode ser token JWT), pular sem erro
+                            continue;
                         }
                     }
                 }
@@ -868,7 +878,7 @@ const InitUtils = {
         // Configurar performance
         PerformanceUtils.setupLazyLoading();
         
-        // Limpar localStorage expirado
+        // Limpar localStorage expirado (FUNÇÃO CORRIGIDA)
         StorageUtils.clearExpired();
         
         // Configurar listeners globais

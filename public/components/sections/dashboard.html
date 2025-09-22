@@ -1,0 +1,144 @@
+<!-- Dashboard Section MELHORADA com Chart.js -->
+<section id="dashboard-section" class="content-section active">
+    <div class="section-header">
+        <h2><i class="fas fa-chart-dashboard"></i> Dashboard</h2>
+        <p>Visão geral do sistema de suporte</p>
+        <div class="real-time-indicator">
+            <i class="fas fa-circle" style="color: #28a745; animation: pulse 2s infinite;"></i>
+            <span>Dados em tempo real</span>
+        </div>
+    </div>
+
+    <!-- Stats Cards (mantendo o existente) -->
+    <div class="stats-grid">
+        <div class="stat-card total">
+            <div class="stat-icon"><i class="fas fa-ticket-alt"></i></div>
+            <div class="stat-info">
+                <h3 id="total-tickets">0</h3>
+                <p>Total de Tickets</p>
+            </div>
+        </div>
+        <div class="stat-card open">
+            <div class="stat-icon"><i class="fas fa-folder-open"></i></div>
+            <div class="stat-info">
+                <h3 id="open-tickets">0</h3>
+                <p>Tickets Abertos</p>
+            </div>
+        </div>
+        <div class="stat-card progress">
+            <div class="stat-icon"><i class="fas fa-cog"></i></div>
+            <div class="stat-info">
+                <h3 id="progress-tickets">0</h3>
+                <p>Em Andamento</p>
+            </div>
+        </div>
+        <div class="stat-card resolved">
+            <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-info">
+                <h3 id="resolved-tickets">0</h3>
+                <p>Resolvidos</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section - NOVA com Chart.js -->
+    <div class="charts-grid-enhanced">
+        <!-- Gráfico de Pizza - Categorias -->
+        <div class="chart-card-enhanced">
+            <div class="chart-header">
+                <h3><i class="fas fa-chart-pie"></i> Tickets por Categoria</h3>
+                <div class="chart-actions">
+                    <button class="btn-chart-refresh" onclick="refreshCategoryChart()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="categoryChartCanvas" width="400" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico de Barras - Prioridades -->
+        <div class="chart-card-enhanced">
+            <div class="chart-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Distribuição por Prioridade</h3>
+                <div class="chart-actions">
+                    <button class="btn-chart-refresh" onclick="refreshPriorityChart()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="priorityChartCanvas" width="400" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico de Linha - Timeline -->
+        <div class="chart-card-enhanced timeline-chart">
+            <div class="chart-header">
+                <h3><i class="fas fa-chart-line"></i> Timeline de Criação de Tickets</h3>
+                <div class="chart-actions">
+                    <select id="timeline-period" onchange="refreshTimelineChart()">
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="14">Últimos 14 dias</option>
+                        <option value="30">Últimos 30 dias</option>
+                    </select>
+                    <button class="btn-chart-refresh" onclick="refreshTimelineChart()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="timelineChartCanvas" width="800" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- Gráfico de Status -->
+        <div class="chart-card-enhanced">
+            <div class="chart-header">
+                <h3><i class="fas fa-tasks"></i> Distribuição por Status</h3>
+                <div class="chart-actions">
+                    <button class="btn-chart-refresh" onclick="refreshStatusChart()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="statusChartCanvas" width="400" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas Adicionais -->
+    <div class="metrics-enhanced">
+        <div class="metric-group">
+            <h3><i class="fas fa-chart-bar"></i> Métricas de Performance</h3>
+            <div class="metrics-cards">
+                <div class="metric-card-small">
+                    <div class="metric-value" id="avg-resolution-time">0h</div>
+                    <div class="metric-label">Tempo Médio Resolução</div>
+                </div>
+                <div class="metric-card-small">
+                    <div class="metric-value" id="today-tickets">0</div>
+                    <div class="metric-label">Tickets Hoje</div>
+                </div>
+                <div class="metric-card-small">
+                    <div class="metric-value" id="satisfaction-rate">95%</div>
+                    <div class="metric-label">Taxa Satisfação</div>
+                </div>
+                <div class="metric-card-small">
+                    <div class="metric-value" id="response-time">2.5h</div>
+                    <div class="metric-label">Tempo Resposta</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Tickets (mantendo o existente) -->
+    <div class="recent-tickets">
+        <h3><i class="fas fa-clock"></i> Tickets Recentes</h3>
+        <div class="tickets-list" id="recent-tickets">
+            <!-- Recent tickets will be populated by JavaScript -->
+        </div>
+    </div>
+</section>

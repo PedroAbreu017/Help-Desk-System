@@ -1,0 +1,90 @@
+<!-- New Ticket Section -->
+<section id="new-ticket-section" class="content-section">
+    <div class="section-header">
+        <h2><i class="fas fa-plus-circle"></i> Criar Novo Ticket</h2>
+        <p>Abrir novo chamado de suporte técnico</p>
+    </div>
+
+    <div class="form-container">
+        <form id="new-ticket-form" class="ticket-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ticket-title">Título do Problema *</label>
+                    <input type="text" id="ticket-title" name="title" required 
+                           placeholder="Ex: Computador não liga">
+                </div>
+                <div class="form-group">
+                    <label for="ticket-category">Categoria *</label>
+                    <select id="ticket-category" name="category" required>
+                        <option value="">Selecione...</option>
+                        <option value="hardware">Hardware</option>
+                        <option value="software">Software</option>
+                        <option value="rede">Rede/Internet</option>
+                        <option value="email">Email</option>
+                        <option value="impressora">Impressora</option>
+                        <option value="sistema">Sistema Interno</option>
+                        <option value="acesso">Controle de Acesso</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ticket-priority">Prioridade *</label>
+                    <select id="ticket-priority" name="priority" required>
+                        <option value="">Selecione...</option>
+                        <option value="baixa">Baixa - Não afeta trabalho</option>
+                        <option value="media">Média - Impacto moderado</option>
+                        <option value="alta">Alta - Impacto significativo</option>
+                        <option value="critica">Crítica - Sistema parado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ticket-department">Departamento *</label>
+                    <select id="ticket-department" name="department" required>
+                        <option value="">Selecione...</option>
+                        <option value="Administração">Administração</option>
+                        <option value="Financeiro">Financeiro</option>
+                        <option value="Vendas">Vendas</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Produção">Produção</option>
+                        <option value="TI">Tecnologia da Informação</option>
+                        <option value="RH">Recursos Humanos</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ticket-user-name">Nome do Usuário *</label>
+                    <input type="text" id="ticket-user-name" name="user_name" required 
+                           placeholder="Nome completo">
+                </div>
+                <div class="form-group">
+                    <label for="ticket-user-email">Email do Usuário *</label>
+                    <input type="email" id="ticket-user-email" name="user_email" required 
+                           placeholder="usuario@empresa.com">
+                </div>
+            </div>
+
+            <div class="form-group full-width">
+                <label for="ticket-description">Descrição Detalhada do Problema *</label>
+                <textarea id="ticket-description" name="description" required rows="6"
+                          placeholder="Descreva o problema com o máximo de detalhes possível. Inclua:
+- O que estava fazendo quando o problema ocorreu
+- Mensagens de erro (se houver)
+- Quando o problema começou
+- Se já tentou alguma solução"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-ticket-alt"></i> Criar Ticket
+                </button>
+                <button type="reset" class="btn btn-secondary">
+                    <i class="fas fa-undo"></i> Limpar
+                </button>
+            </div>
+        </form>
+    </div>
+</section>

@@ -1,0 +1,262 @@
+// src/config/database.js - Configuração de Banco de Dados
+const mysql = require('mysql2/promise');
+const fs = require('fs').promises;
+const path = require('path');
+
+let db = null;
+let dbType = null;
+
+// Configuração MySQL
+const dbConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'helpdesk_system',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    acquireTimeout: 60000,
+    timeout: 60000,
+    reconnect: true,
+    charset: 'utf8mb4',
+    timezone: '+00:00'
+};
+
+async function initDatabase() {
+    try {
+        console.log('🔗 Conectando ao MySQL...');
+        
+        // Tentar conectar ao MySQL
+        await connectMySQL();
+        
+    } catch (error) {
+        console.error('❌ Erro ao conectar MySQL:', error.message);
+        
+        // Fallback para SQLite em desenvolvimento
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('🔄 Usando SQLite como fallback...');
+            await connectSQLite();
+        } else {
+            throw error;
+        }
+    }
+}
+
+async function connectMySQL() {
+    // Criar conexão inicial para criar database
+    const tempConnection = await mysql.createConnection({
+        host: dbConfig.host,
+        user: dbConfig.user,
+        password: dbConfig.password,
+        charset: 'utf8mb4'
+    });
+
+    // Criar database se não existir
+    await tempConnection.execute(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    await tempConnection.end();
+
+    // Criar pool de conexões
+    db = mysql.createPool(dbConfig);
+    dbType = 'mysql';
+    
+    // Testar conexão
+    const connection = await db.getConnection();
+    connection.release();
+    
+    console.log('✅ MySQL conectado com sucesso');
+    
+    // Criar tabelas se necessário
+    await createMySQLTables();
+}
+
+async function connectSQLite() {
+    const sqlite3 = require('sqlite3').verbose();
+    const { open } = require('sqlite');
+    
+    // Criar diretório data
+    const dataDir = path.join(__dirname, '../../data');
+    await fs.mkdir(dataDir, { recursive: true });
+    
+    db = await open({
+        filename: path.join(dataDir, 'helpdesk.db'),
+        driver: sqlite3.Database
+    });
+    
+    dbType = 'sqlite';
+    
+    console.log('✅ SQLite conectado (fallback)');
+    
+    // Criar tabelas se necessário
+    await createSQLiteTables();
+}
+
+async function createMySQLTables() {
+    const tables = [
+        `CREATE TABLE IF NOT EXISTS users (
+            id VARCHAR(50) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            role ENUM('admin', 'technician', 'user') DEFAULT 'user',
+            department VARCHAR(100),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_email (email),
+            INDEX idx_role (role)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+        `CREATE TABLE IF NOT EXISTS tickets (
+            id VARCHAR(50) PRIMARY KEY,
+            title VARCHAR(500) NOT NULL,
+            description TEXT NOT NULL,
+            category ENUM('hardware', 'software', 'rede', 'email', 'impressora', 'sistema', 'acesso') NOT NULL,
+            priority ENUM('baixa', 'media', 'alta', 'critica') NOT NULL,
+            status ENUM('aberto', 'andamento', 'resolvido', 'fechado') DEFAULT 'aberto',
+            user_name VARCHAR(255) NOT NULL,
+            user_email VARCHAR(255) NOT NULL,
+            department VARCHAR(100) NOT NULL,
+            assigned_to VARCHAR(50) NULL,
+            solution TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP NULL,
+            INDEX idx_status (status),
+            INDEX idx_priority (priority),
+            INDEX idx_category (category),
+            INDEX idx_created_at (created_at),
+            FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+        `CREATE TABLE IF NOT EXISTS ticket_notes (
+            id VARCHAR(50) PRIMARY KEY,
+            ticket_id VARCHAR(50) NOT NULL,
+            content TEXT NOT NULL,
+            author VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ticket_id (ticket_id),
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+        `CREATE TABLE IF NOT EXISTS activity_logs (
+            id VARCHAR(50) PRIMARY KEY,
+            ticket_id VARCHAR(50),
+            action VARCHAR(100) NOT NULL,
+            description TEXT,
+            user_name VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ticket_id (ticket_id),
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+    ];
+
+    for (const table of tables) {
+        await db.execute(table);
+    }
+    
+    console.log('📋 Tabelas MySQL verificadas/criadas');
+}
+
+async function createSQLiteTables() {
+    const tables = [
+        `CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            role TEXT DEFAULT 'user',
+            department TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS tickets (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            status TEXT DEFAULT 'aberto',
+            user_name TEXT NOT NULL,
+            user_email TEXT NOT NULL,
+            department TEXT NOT NULL,
+            assigned_to TEXT,
+            solution TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            resolved_at DATETIME,
+            FOREIGN KEY (assigned_to) REFERENCES users(id)
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS ticket_notes (
+            id TEXT PRIMARY KEY,
+            ticket_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            author TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+        )`,
+
+        `CREATE TABLE IF NOT EXISTS activity_logs (
+            id TEXT PRIMARY KEY,
+            ticket_id TEXT,
+            action TEXT NOT NULL,
+            description TEXT,
+            user_name TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
+        )`
+    ];
+
+    for (const table of tables) {
+        await db.exec(table);
+    }
+    
+    console.log('📋 Tabelas SQLite verificadas/criadas');
+}
+
+// Funções de acesso ao banco
+function getDatabase() {
+    if (!db) {
+        throw new Error('Database não inicializado. Execute initDatabase() primeiro.');
+    }
+    return db;
+}
+
+function getDatabaseType() {
+    return dbType;
+}
+
+async function executeQuery(query, params = []) {
+    const database = getDatabase();
+    
+    if (dbType === 'mysql') {
+        const [rows] = await database.execute(query, params);
+        return rows;
+    } else {
+        // SQLite
+        if (query.toUpperCase().startsWith('SELECT')) {
+            return await database.all(query, params);
+        } else {
+            return await database.run(query, params);
+        }
+    }
+}
+
+async function closeDatabase() {
+    if (db) {
+        if (dbType === 'mysql' && typeof db.end === 'function') {
+            await db.end();
+        } else if (dbType === 'sqlite' && typeof db.close === 'function') {
+            await db.close();
+        }
+        console.log('💾 Conexão com banco encerrada');
+        db = null;
+        dbType = null;
+    }
+}
+
+module.exports = {
+    initDatabase,
+    getDatabase,
+    getDatabaseType,
+    executeQuery,
+    closeDatabase
+};

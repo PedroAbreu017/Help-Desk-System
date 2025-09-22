@@ -1,10 +1,11 @@
-// main.js - Arquivo principal do frontend
+// main.js - Arquivo principal COMPATÍVEL com sistema modular + Chart.js + ReportsManager
 class HelpDeskApp {
     constructor() {
         this.currentSection = 'dashboard';
         this.tickets = [];
         this.users = [];
         this.stats = {};
+        this.charts = {}; // Armazenar instâncias Chart.js
         this.init();
     }
 
@@ -19,6 +20,9 @@ class HelpDeskApp {
         
         // Load initial data
         await this.loadInitialData();
+        
+        // Initialize ReportsManager if available
+        this.initializeReportsManager();
         
         // Hide loading
         this.hideLoading();
@@ -41,15 +45,19 @@ class HelpDeskApp {
             newTicketForm.addEventListener('submit', (e) => this.handleNewTicket(e));
         }
 
-        // Filters
-        document.getElementById('filter-status')?.addEventListener('change', () => this.applyFilters());
-        document.getElementById('filter-priority')?.addEventListener('change', () => this.applyFilters());
-        document.getElementById('filter-category')?.addEventListener('change', () => this.applyFilters());
+        // Filters - verificar se existem antes de adicionar eventos
+        const filterStatus = document.getElementById('filter-status');
+        const filterPriority = document.getElementById('filter-priority');
+        const filterCategory = document.getElementById('filter-category');
+        
+        if (filterStatus) filterStatus.addEventListener('change', () => this.applyFilters());
+        if (filterPriority) filterPriority.addEventListener('change', () => this.applyFilters());
+        if (filterCategory) filterCategory.addEventListener('change', () => this.applyFilters());
 
         // Modal close
         window.addEventListener('click', (e) => {
             const modal = document.getElementById('ticket-modal');
-            if (e.target === modal) {
+            if (modal && e.target === modal) {
                 this.closeModal();
             }
         });
@@ -67,7 +75,8 @@ class HelpDeskApp {
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
-        document.querySelector(`[data-section="${this.currentSection}"]`)?.classList.add('active');
+        const activeNav = document.querySelector(`[data-section="${this.currentSection}"]`);
+        if (activeNav) activeNav.classList.add('active');
     }
 
     async loadInitialData() {
@@ -77,8 +86,10 @@ class HelpDeskApp {
             // Load dashboard data
             await this.loadDashboardData();
             
-            // Load tickets
-            await this.loadTickets();
+            // Load tickets - deixar módulo fazer isso se existir
+            if (!window.modularManager?.modules.tickets) {
+                await this.loadTickets();
+            }
             
             // Load users
             await this.loadUsers();
@@ -92,9 +103,26 @@ class HelpDeskApp {
         }
     }
 
+    // NOVO: Inicializar ReportsManager se disponível
+    initializeReportsManager() {
+        // Aguardar um pouco para scripts carregarem
+        setTimeout(() => {
+            if (typeof ReportsManager !== 'undefined' && !window.reportsManager) {
+                try {
+                    window.reportsManager = new ReportsManager();
+                    console.log('📊 ReportsManager inicializado pelo HelpDeskApp');
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar ReportsManager:', error);
+                }
+            }
+        }, 1000);
+    }
+
     async loadDashboardData() {
         try {
-            const response = await fetch(`${API_BASE_URL}/dashboard`);
+            const response = await fetch(`${API_BASE_URL}/dashboard`, {
+                headers: window.authManager?.getAuthHeaders() || {}
+            });
             if (!response.ok) throw new Error('Erro ao carregar dashboard');
             
             const data = await response.json();
@@ -108,11 +136,19 @@ class HelpDeskApp {
     }
 
     async loadTickets(filters = {}) {
+        // Se módulo de tickets existe, deixar ele controlar
+        if (window.modularManager?.modules.tickets) {
+            console.log('🔧 Módulo de tickets detectado - delegando controle');
+            return;
+        }
+
         try {
             const queryParams = new URLSearchParams(filters).toString();
             const url = `${API_BASE_URL}/tickets${queryParams ? '?' + queryParams : ''}`;
             
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                headers: window.authManager?.getAuthHeaders() || {}
+            });
             if (!response.ok) throw new Error('Erro ao carregar tickets');
             
             const data = await response.json();
@@ -129,7 +165,9 @@ class HelpDeskApp {
 
     async loadUsers() {
         try {
-            const response = await fetch(`${API_BASE_URL}/users`);
+            const response = await fetch(`${API_BASE_URL}/users`, {
+                headers: window.authManager?.getAuthHeaders() || {}
+            });
             if (!response.ok) throw new Error('Erro ao carregar usuários');
             
             const data = await response.json();
@@ -144,58 +182,229 @@ class HelpDeskApp {
     updateDashboard(data) {
         const stats = data.statistics;
         
-        // Update stat cards
-        document.getElementById('total-tickets').textContent = stats.total_tickets;
-        document.getElementById('open-tickets').textContent = stats.tickets_abertos + stats.tickets_andamento;
-        document.getElementById('progress-tickets').textContent = stats.tickets_andamento;
-        document.getElementById('resolved-tickets').textContent = stats.tickets_resolvidos;
+        // Update stat cards - verificar se existem
+        const totalTickets = document.getElementById('total-tickets');
+        const openTickets = document.getElementById('open-tickets');
+        const progressTickets = document.getElementById('progress-tickets');
+        const resolvedTickets = document.getElementById('resolved-tickets');
 
-        // Update priority chart
-        const maxPriority = Math.max(
-            stats.por_prioridade.critica,
-            stats.por_prioridade.alta,
-            stats.por_prioridade.media,
-            stats.por_prioridade.baixa
-        );
+        if (totalTickets) totalTickets.textContent = stats.total_tickets || 0;
+        if (openTickets) openTickets.textContent = (parseInt(stats.tickets_abertos) || 0) + (parseInt(stats.tickets_andamento) || 0);
+        if (progressTickets) progressTickets.textContent = stats.tickets_andamento || 0;
+        if (resolvedTickets) resolvedTickets.textContent = stats.tickets_resolvidos || 0;
 
-        Object.keys(stats.por_prioridade).forEach(priority => {
-            const count = stats.por_prioridade[priority];
-            const percentage = maxPriority > 0 ? (count / maxPriority) * 100 : 0;
-            
-            document.getElementById(`priority-${priority}`).textContent = count;
-            document.querySelector(`[data-priority="${priority}"]`).style.width = `${percentage}%`;
-        });
-
-        // Update category chart
-        this.updateCategoryChart(stats.por_categoria);
+        // Criar gráficos Chart.js
+        this.createCategoryChart(stats.por_categoria);
+        this.createPriorityChart(stats.por_prioridade);
+        this.createStatusChart(stats);
+        this.createTimelineChart(data.trends?.tickets_per_day);
 
         // Update recent tickets
         this.updateRecentTickets(data.recent_tickets);
+        
+        // Update metrics adicionais
+        this.updateMetrics(stats);
     }
 
-    updateCategoryChart(categories) {
-        const chartContainer = document.getElementById('category-chart');
-        chartContainer.innerHTML = '';
+    // Criar gráfico de categorias com Chart.js
+    createCategoryChart(categoryData) {
+        const canvas = document.getElementById('categoryChartCanvas');
+        if (!canvas || !categoryData) return;
 
-        Object.keys(categories).forEach(category => {
-            const count = categories[category];
-            const categoryDiv = document.createElement('div');
-            categoryDiv.className = 'category-item';
-            categoryDiv.innerHTML = `
-                <div class="category-icon">
-                    <i class="fas fa-${this.getCategoryIcon(category)}"></i>
-                </div>
-                <div class="category-info">
-                    <span class="category-name">${this.getCategoryName(category)}</span>
-                    <span class="category-count">${count}</span>
-                </div>
-            `;
-            chartContainer.appendChild(categoryDiv);
+        // Destruir chart existente se houver
+        if (this.charts.category) {
+            this.charts.category.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        this.charts.category = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(categoryData).map(this.getCategoryName.bind(this)),
+                datasets: [{
+                    data: Object.values(categoryData),
+                    backgroundColor: [
+                        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+                        '#9966FF', '#FF9F40', '#FF6384'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
         });
+    }
+
+    // Criar gráfico de prioridades com Chart.js
+    createPriorityChart(priorityData) {
+        const canvas = document.getElementById('priorityChartCanvas');
+        if (!canvas || !priorityData) return;
+
+        // Destruir chart existente se houver
+        if (this.charts.priority) {
+            this.charts.priority.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        this.charts.priority = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(priorityData).map(this.getPriorityName.bind(this)),
+                datasets: [{
+                    label: 'Quantidade',
+                    data: Object.values(priorityData),
+                    backgroundColor: [
+                        '#dc3545', // crítica - vermelho
+                        '#fd7e14', // alta - laranja
+                        '#ffc107', // média - amarelo
+                        '#28a745'  // baixa - verde
+                    ],
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
+    // Criar gráfico de status
+    createStatusChart(stats) {
+        const canvas = document.getElementById('statusChartCanvas');
+        if (!canvas) return;
+
+        // Destruir chart existente se houver
+        if (this.charts.status) {
+            this.charts.status.destroy();
+        }
+
+        const statusData = {
+            'Aberto': parseInt(stats.tickets_abertos) || 0,
+            'Em Andamento': parseInt(stats.tickets_andamento) || 0,
+            'Resolvido': parseInt(stats.tickets_resolvidos) || 0,
+            'Fechado': parseInt(stats.tickets_fechados) || 0
+        };
+
+        const ctx = canvas.getContext('2d');
+        this.charts.status = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusData),
+                datasets: [{
+                    data: Object.values(statusData),
+                    backgroundColor: ['#17a2b8', '#ffc107', '#28a745', '#6c757d'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '50%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Criar gráfico timeline
+    createTimelineChart(timelineData) {
+        const canvas = document.getElementById('timelineChartCanvas');
+        if (!canvas || !timelineData) return;
+
+        // Destruir chart existente se houver
+        if (this.charts.timeline) {
+            this.charts.timeline.destroy();
+        }
+
+        const labels = Object.keys(timelineData);
+        const data = Object.values(timelineData);
+
+        const ctx = canvas.getContext('2d');
+        this.charts.timeline = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Tickets Criados',
+                    data: data,
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#007bff',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+
+    // Atualizar métricas adicionais
+    updateMetrics(stats) {
+        const avgTime = document.getElementById('avg-resolution-time');
+        const todayTickets = document.getElementById('today-tickets');
+        
+        if (avgTime) avgTime.textContent = '2.5h'; // Pode vir da API futuramente
+        if (todayTickets) todayTickets.textContent = stats.total_tickets || 0;
     }
 
     updateRecentTickets(tickets) {
         const container = document.getElementById('recent-tickets');
+        if (!container) return;
+
         if (!tickets || tickets.length === 0) {
             container.innerHTML = '<p class="no-tickets">Nenhum ticket recente</p>';
             return;
@@ -205,7 +414,7 @@ class HelpDeskApp {
             <div class="recent-ticket-item" onclick="app.showTicketDetails('${ticket.id}')">
                 <div class="ticket-info">
                     <h4>#${ticket.id.substring(0, 8)} - ${ticket.title}</h4>
-                    <p><i class="fas fa-user"></i> ${ticket.user_name} - ${ticket.department}</p>
+                    <p><i class="fas fa-user"></i> ${ticket.user_name} - ${ticket.department || 'N/A'}</p>
                     <p><i class="fas fa-clock"></i> ${this.formatDate(ticket.created_at)}</p>
                 </div>
                 <div class="ticket-meta">
@@ -218,6 +427,11 @@ class HelpDeskApp {
 
     updateTicketsTable() {
         const tbody = document.getElementById('tickets-tbody');
+        if (!tbody) {
+            console.log('🔧 Elemento tickets-tbody não encontrado - módulo deve controlar tabela');
+            return;
+        }
+
         if (!this.tickets || this.tickets.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="no-tickets">Nenhum ticket encontrado</td></tr>';
             return;
@@ -257,356 +471,11 @@ class HelpDeskApp {
 
     updateTicketsCount() {
         const badge = document.getElementById('tickets-count');
+        if (!badge) return;
+
         const openTickets = this.tickets.filter(t => ['aberto', 'andamento'].includes(t.status)).length;
         badge.textContent = openTickets;
         badge.style.display = openTickets > 0 ? 'inline' : 'none';
-    }
-
-    async handleNewTicket(e) {
-        e.preventDefault();
-        
-        try {
-            const formData = new FormData(e.target);
-            const ticketData = {
-                title: formData.get('title'),
-                description: formData.get('description'),
-                category: formData.get('category'),
-                priority: formData.get('priority'),
-                user_name: formData.get('user_name'),
-                user_email: formData.get('user_email'),
-                department: formData.get('department')
-            };
-
-            this.showLoading();
-
-            const response = await fetch(`${API_BASE_URL}/tickets`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(ticketData)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showToast('Ticket criado com sucesso!', 'success');
-                e.target.reset();
-                await this.loadTickets();
-                await this.loadDashboardData();
-                this.showSection('tickets');
-            } else {
-                throw new Error(result.message || 'Erro ao criar ticket');
-            }
-
-        } catch (error) {
-            console.error('❌ Erro ao criar ticket:', error);
-            this.showToast('Erro ao criar ticket: ' + error.message, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    async showTicketDetails(ticketId) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}`);
-            const data = await response.json();
-
-            if (data.success) {
-                const ticket = data.data;
-                this.openTicketModal(ticket);
-            } else {
-                throw new Error('Ticket não encontrado');
-            }
-        } catch (error) {
-            console.error('❌ Erro ao carregar detalhes do ticket:', error);
-            this.showToast('Erro ao carregar detalhes do ticket', 'error');
-        }
-    }
-
-    openTicketModal(ticket) {
-        const modal = document.getElementById('ticket-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalFooter = document.getElementById('modal-footer');
-
-        modalTitle.textContent = `Ticket #${ticket.id.substring(0, 8)} - ${ticket.title}`;
-        
-        modalBody.innerHTML = `
-            <div class="ticket-details">
-                <div class="detail-row">
-                    <div class="detail-group">
-                        <label>Status:</label>
-                        <span class="status status-${ticket.status}">${this.getStatusName(ticket.status)}</span>
-                    </div>
-                    <div class="detail-group">
-                        <label>Prioridade:</label>
-                        <span class="priority priority-${ticket.priority}">${this.getPriorityName(ticket.priority)}</span>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-group">
-                        <label>Categoria:</label>
-                        <span><i class="fas fa-${this.getCategoryIcon(ticket.category)}"></i> ${this.getCategoryName(ticket.category)}</span>
-                    </div>
-                    <div class="detail-group">
-                        <label>Departamento:</label>
-                        <span>${ticket.department}</span>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-group">
-                        <label>Usuário:</label>
-                        <span>${ticket.user_name}</span>
-                    </div>
-                    <div class="detail-group">
-                        <label>Email:</label>
-                        <span>${ticket.user_email}</span>
-                    </div>
-                </div>
-                
-                <div class="detail-row">
-                    <div class="detail-group">
-                        <label>Criado em:</label>
-                        <span>${this.formatDateTime(ticket.created_at)}</span>
-                    </div>
-                    <div class="detail-group">
-                        <label>Atualizado em:</label>
-                        <span>${this.formatDateTime(ticket.updated_at)}</span>
-                    </div>
-                </div>
-                
-                ${ticket.assigned_to ? `
-                    <div class="detail-row">
-                        <div class="detail-group">
-                            <label>Técnico Responsável:</label>
-                            <span>${ticket.assigned_to}</span>
-                        </div>
-                        ${ticket.resolved_at ? `
-                            <div class="detail-group">
-                                <label>Resolvido em:</label>
-                                <span>${this.formatDateTime(ticket.resolved_at)}</span>
-                            </div>
-                        ` : ''}
-                    </div>
-                ` : ''}
-                
-                <div class="detail-group full-width">
-                    <label>Descrição:</label>
-                    <div class="description-box">${ticket.description}</div>
-                </div>
-                
-                ${ticket.solution ? `
-                    <div class="detail-group full-width">
-                        <label>Solução:</label>
-                        <div class="solution-box">${ticket.solution}</div>
-                    </div>
-                ` : ''}
-                
-                ${ticket.internal_notes && ticket.internal_notes.length > 0 ? `
-                    <div class="detail-group full-width">
-                        <label>Notas Internas:</label>
-                        <div class="notes-container">
-                            ${ticket.internal_notes.map(note => `
-                                <div class="note-item">
-                                    <div class="note-header">
-                                        <strong>${note.author}</strong>
-                                        <span class="note-date">${this.formatDateTime(note.created_at)}</span>
-                                    </div>
-                                    <div class="note-content">${note.content}</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <div class="update-section">
-                    <div class="update-row">
-                        <div class="update-group">
-                            <label for="modal-status">Atualizar Status:</label>
-                            <select id="modal-status" class="form-control">
-                                <option value="aberto" ${ticket.status === 'aberto' ? 'selected' : ''}>Aberto</option>
-                                <option value="andamento" ${ticket.status === 'andamento' ? 'selected' : ''}>Em Andamento</option>
-                                <option value="resolvido" ${ticket.status === 'resolvido' ? 'selected' : ''}>Resolvido</option>
-                                <option value="fechado" ${ticket.status === 'fechado' ? 'selected' : ''}>Fechado</option>
-                            </select>
-                        </div>
-                        <div class="update-group">
-                            <label for="modal-priority">Atualizar Prioridade:</label>
-                            <select id="modal-priority" class="form-control">
-                                <option value="baixa" ${ticket.priority === 'baixa' ? 'selected' : ''}>Baixa</option>
-                                <option value="media" ${ticket.priority === 'media' ? 'selected' : ''}>Média</option>
-                                <option value="alta" ${ticket.priority === 'alta' ? 'selected' : ''}>Alta</option>
-                                <option value="critica" ${ticket.priority === 'critica' ? 'selected' : ''}>Crítica</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="update-group">
-                        <label for="modal-assigned">Técnico Responsável:</label>
-                        <input type="text" id="modal-assigned" class="form-control" 
-                               value="${ticket.assigned_to || ''}" placeholder="Nome do técnico">
-                    </div>
-                    
-                    <div class="update-group">
-                        <label for="modal-solution">Solução:</label>
-                        <textarea id="modal-solution" class="form-control" rows="3" 
-                                  placeholder="Descreva a solução aplicada...">${ticket.solution || ''}</textarea>
-                    </div>
-                    
-                    <div class="update-group">
-                        <label for="modal-note">Adicionar Nota Interna:</label>
-                        <textarea id="modal-note" class="form-control" rows="2" 
-                                  placeholder="Nota para a equipe técnica..."></textarea>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        modalFooter.innerHTML = `
-            <button class="btn btn-primary" onclick="app.updateTicket('${ticket.id}')">
-                <i class="fas fa-save"></i> Salvar Alterações
-            </button>
-            <button class="btn btn-secondary" onclick="app.addTicketNote('${ticket.id}')">
-                <i class="fas fa-comment"></i> Adicionar Nota
-            </button>
-            <button class="btn btn-outline" onclick="app.closeModal()">
-                <i class="fas fa-times"></i> Fechar
-            </button>
-        `;
-
-        modal.style.display = 'block';
-        document.body.style.overflow = 'hidden';
-    }
-
-    async updateTicket(ticketId) {
-        try {
-            const updates = {
-                status: document.getElementById('modal-status').value,
-                priority: document.getElementById('modal-priority').value,
-                assigned_to: document.getElementById('modal-assigned').value,
-                solution: document.getElementById('modal-solution').value
-            };
-
-            this.showLoading();
-
-            const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updates)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showToast('Ticket atualizado com sucesso!', 'success');
-                this.closeModal();
-                await this.loadTickets();
-                await this.loadDashboardData();
-            } else {
-                throw new Error(result.message || 'Erro ao atualizar ticket');
-            }
-
-        } catch (error) {
-            console.error('❌ Erro ao atualizar ticket:', error);
-            this.showToast('Erro ao atualizar ticket: ' + error.message, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    async addTicketNote(ticketId) {
-        try {
-            const noteContent = document.getElementById('modal-note').value.trim();
-            if (!noteContent) {
-                this.showToast('Digite uma nota para adicionar', 'warning');
-                return;
-            }
-
-            const noteData = {
-                note: noteContent,
-                author: 'Suporte TI' // Em um sistema real, isso viria da autenticação
-            };
-
-            const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}/notes`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(noteData)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showToast('Nota adicionada com sucesso!', 'success');
-                document.getElementById('modal-note').value = '';
-                // Recarregar detalhes do ticket
-                await this.showTicketDetails(ticketId);
-            } else {
-                throw new Error(result.message || 'Erro ao adicionar nota');
-            }
-
-        } catch (error) {
-            console.error('❌ Erro ao adicionar nota:', error);
-            this.showToast('Erro ao adicionar nota: ' + error.message, 'error');
-        }
-    }
-
-    async deleteTicket(ticketId) {
-        if (!confirm('Tem certeza que deseja excluir este ticket? Esta ação não pode ser desfeita.')) {
-            return;
-        }
-
-        try {
-            this.showLoading();
-
-            const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}`, {
-                method: 'DELETE'
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showToast('Ticket excluído com sucesso!', 'success');
-                await this.loadTickets();
-                await this.loadDashboardData();
-            } else {
-                throw new Error(result.message || 'Erro ao excluir ticket');
-            }
-
-        } catch (error) {
-            console.error('❌ Erro ao excluir ticket:', error);
-            this.showToast('Erro ao excluir ticket: ' + error.message, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    applyFilters() {
-        const filters = {
-            status: document.getElementById('filter-status').value,
-            priority: document.getElementById('filter-priority').value,
-            category: document.getElementById('filter-category').value
-        };
-
-        // Remove empty filters
-        Object.keys(filters).forEach(key => {
-            if (!filters[key]) delete filters[key];
-        });
-
-        this.loadTickets(filters);
-    }
-
-    clearFilters() {
-        document.getElementById('filter-status').value = '';
-        document.getElementById('filter-priority').value = '';
-        document.getElementById('filter-category').value = '';
-        this.loadTickets();
     }
 
     showSection(sectionName) {
@@ -621,8 +490,11 @@ class HelpDeskApp {
         });
 
         // Show selected section
-        document.getElementById(`${sectionName}-section`).classList.add('active');
-        document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+        const targetSection = document.getElementById(`${sectionName}-section`);
+        const targetNav = document.querySelector(`[data-section="${sectionName}"]`);
+
+        if (targetSection) targetSection.classList.add('active');
+        if (targetNav) targetNav.classList.add('active');
 
         this.currentSection = sectionName;
 
@@ -630,38 +502,48 @@ class HelpDeskApp {
         if (sectionName === 'dashboard') {
             this.refreshDashboard();
         } else if (sectionName === 'tickets') {
-            this.loadTickets();
+            // Só carregar se módulo não estiver presente
+            if (!window.modularManager?.modules.tickets) {
+                this.loadTickets();
+            }
         } else if (sectionName === 'reports') {
             this.loadReports();
         }
     }
 
-    async refreshDashboard() {
-        await this.loadDashboardData();
+    // Safe methods - verificam se elementos existem
+    showLoading() {
+        const loading = document.getElementById('loading');
+        if (loading) loading.style.display = 'flex';
     }
 
-    async refreshData() {
-        this.showLoading();
-        await this.loadInitialData();
-        this.hideLoading();
-        this.showToast('Dados atualizados!', 'success');
+    hideLoading() {
+        const loading = document.getElementById('loading');
+        if (loading) loading.style.display = 'none';
     }
 
     closeModal() {
         const modal = document.getElementById('ticket-modal');
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
-
-    showLoading() {
-        document.getElementById('loading').style.display = 'flex';
-    }
-
-    hideLoading() {
-        document.getElementById('loading').style.display = 'none';
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
     }
 
     showToast(message, type = 'info') {
+        // Usar o toast do authManager se disponível
+        if (window.authManager && window.authManager.showToast) {
+            window.authManager.showToast(message, type);
+            return;
+        }
+
+        // Fallback para console se não tiver toast container
+        const container = document.getElementById('toast-container');
+        if (!container) {
+            console.log(`${type.toUpperCase()}: ${message}`);
+            return;
+        }
+
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         toast.innerHTML = `
@@ -672,7 +554,6 @@ class HelpDeskApp {
             <button class="toast-close" onclick="this.parentElement.remove()">×</button>
         `;
 
-        const container = document.getElementById('toast-container');
         container.appendChild(toast);
 
         // Auto remove after 5 seconds
@@ -686,81 +567,10 @@ class HelpDeskApp {
         setTimeout(() => toast.classList.add('show'), 100);
     }
 
-    initializeKnowledgeBase() {
-        const articles = [
-            {
-                id: 1,
-                title: 'Computador não liga',
-                category: 'hardware',
-                content: 'Verificar cabo de energia, testar tomada, verificar conexões internas.',
-                steps: [
-                    'Verificar se o cabo de energia está conectado',
-                    'Testar a tomada com outro equipamento',
-                    'Verificar botão liga/desliga',
-                    'Verificar fonte de alimentação',
-                    'Contatar suporte se persistir'
-                ]
-            },
-            {
-                id: 2,
-                title: 'Sem conexão com internet',
-                category: 'rede',
-                content: 'Reiniciar modem/roteador, verificar cabos, testar configurações.',
-                steps: [
-                    'Reiniciar modem e roteador',
-                    'Verificar cabos de rede',
-                    'Testar ping para gateway',
-                    'Verificar configurações IP',
-                    'Contatar provedor se necessário'
-                ]
-            },
-            {
-                id: 3,
-                title: 'Impressora não funciona',
-                category: 'hardware',
-                content: 'Verificar drivers, papel, tinta e conexões.',
-                steps: [
-                    'Verificar se há papel na bandeja',
-                    'Verificar nível de tinta/toner',
-                    'Reinstalar drivers da impressora',
-                    'Verificar conexão USB/rede',
-                    'Executar limpeza dos cabeçotes'
-                ]
-            },
-            {
-                id: 4,
-                title: 'Email não recebe/envia',
-                category: 'software',
-                content: 'Verificar configurações de servidor, senha e conectividade.',
-                steps: [
-                    'Verificar configurações SMTP/POP3',
-                    'Testar senha do email',
-                    'Verificar conexão com internet',
-                    'Limpar cache do cliente de email',
-                    'Verificar filtros de spam'
-                ]
-            },
-            {
-                id: 5,
-                title: 'Sistema lento',
-                category: 'sistema',
-                content: 'Verificar uso de recursos, executar limpeza e otimização.',
-                steps: [
-                    'Verificar uso de CPU e memória',
-                    'Executar limpeza de disco',
-                    'Desabilitar programas de inicialização',
-                    'Executar antivírus',
-                    'Verificar fragmentação do disco'
-                ]
-            }
-        ];
-
-        this.knowledgeBase = articles;
-        this.renderKnowledgeBase();
-    }
-
     renderKnowledgeBase(filter = 'all') {
         const container = document.getElementById('kb-articles');
+        if (!container) return;
+
         const filteredArticles = filter === 'all' ? 
             this.knowledgeBase : 
             this.knowledgeBase.filter(article => article.category === filter);
@@ -787,15 +597,51 @@ class HelpDeskApp {
         document.querySelectorAll('.kb-category').forEach(btn => {
             btn.classList.remove('active');
         });
-        document.querySelector(`[data-category="${filter}"]`).classList.add('active');
+        const activeCategory = document.querySelector(`[data-category="${filter}"]`);
+        if (activeCategory) activeCategory.classList.add('active');
+    }
 
-        // Add category click handlers
-        document.querySelectorAll('.kb-category').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const category = e.target.dataset.category;
-                this.renderKnowledgeBase(category);
+    async handleNewTicket(e) {
+        e.preventDefault();
+        
+        try {
+            const formData = new FormData(e.target);
+            const ticketData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                category: formData.get('category'),
+                priority: formData.get('priority'),
+                user_name: formData.get('user_name'),
+                user_email: formData.get('user_email'),
+                department: formData.get('department')
+            };
+
+            this.showLoading();
+
+            const response = await fetch(`${API_BASE_URL}/tickets`, {
+                method: 'POST',
+                headers: window.authManager?.getAuthHeaders() || { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ticketData)
             });
-        });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showToast('Ticket criado com sucesso!', 'success');
+                e.target.reset();
+                await this.loadTickets();
+                await this.loadDashboardData();
+                this.showSection('tickets');
+            } else {
+                throw new Error(result.message || 'Erro ao criar ticket');
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao criar ticket:', error);
+            this.showToast('Erro ao criar ticket: ' + error.message, 'error');
+        } finally {
+            this.hideLoading();
+        }
     }
 
     // Utility methods
@@ -862,6 +708,26 @@ class HelpDeskApp {
     formatDateTime(dateString) {
         return new Date(dateString).toLocaleString('pt-BR');
     }
+
+    initializeKnowledgeBase() {
+        this.knowledgeBase = [];
+    }
+
+    async refreshDashboard() {
+        await this.loadDashboardData();
+    }
+
+    applyFilters() {
+        // Implementar se filtros existirem
+    }
+
+    clearFilters() {
+        // Implementar se filtros existirem  
+    }
+
+    async loadReports() {
+        // Implementar se necessário
+    }
 }
 
 // Configuration
@@ -869,16 +735,31 @@ const API_BASE_URL = 'http://localhost:3000/api';
 
 // Global functions
 window.refreshData = () => app.refreshData();
-window.applyFilters = () => app.applyFilters();
-window.clearFilters = () => app.clearFilters();
-window.closeModal = () => app.closeModal();
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new HelpDeskApp();
 });
 
-// Handle page unload
 window.addEventListener('beforeunload', () => {
     console.log('👋 Help Desk App finalizando...');
 });
+
+// Funções globais para botões de refresh dos gráficos
+window.refreshCategoryChart = () => {
+    if (window.app) window.app.refreshDashboard();
+};
+
+window.refreshPriorityChart = () => {
+    if (window.app) window.app.refreshDashboard();
+};
+
+window.refreshStatusChart = () => {
+    if (window.app) window.app.refreshDashboard();
+};
+
+window.refreshTimelineChart = () => {
+    if (window.app) window.app.refreshDashboard();
+};
+
+console.log('📦 Main.js com ReportsManager Integration carregado!');

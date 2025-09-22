@@ -1,0 +1,41 @@
+<!-- Sistema Modular Scripts -->
+<script src="js/core/base-module.js"></script>
+<script src="js/modules/dashboard-module.js"></script>
+<script src="js/modules/tickets-module.js"></script>
+<script src="js/modules/auth-module.js"></script>
+<script src="js/modules/charts-module.js"></script>
+<script src="js/modular-manager.js"></script>
+<script src="js/reports.js"></script>
+
+<!-- Sistema de indicação modular -->
+<script>
+function updateModularIndicator(activeModules = []) {
+    const indicator = document.getElementById('modular-indicator');
+    const counter = document.getElementById('active-modules-count');
+    
+    if (activeModules.length > 0) {
+        counter.textContent = activeModules.length;
+        indicator.classList.add('active');
+        indicator.title = `Módulos ativos: ${activeModules.join(', ')}`;
+    } else {
+        indicator.classList.remove('active');
+    }
+}
+
+// Sistema modular pronto
+document.addEventListener('modularSystemReady', function() {
+    console.log('Sistema modular totalmente carregado!');
+    const indicator = document.getElementById('modular-indicator');
+    const counter = document.getElementById('active-modules-count');
+    
+    if (window.modularSystem && window.modularSystem.isReady()) {
+        const loadedCount = window.modularSystem.loader.loadedComponents.size;
+        counter.textContent = loadedCount;
+        indicator.classList.add('active');
+        indicator.title = `Sistema modular: ${loadedCount} componentes carregados`;
+    }
+});
+</script>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>

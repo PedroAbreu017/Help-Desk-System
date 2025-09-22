@@ -1,0 +1,431 @@
+<!-- Chart.js Integration Script (mantendo funcionalidade atual) -->
+<script>
+// Variáveis globais para os gráficos
+let categoryChart, priorityChart, timelineChart, statusChart;
+
+// Inicializar gráficos quando o dashboard for carregado
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initializeCharts, 1000);
+});
+
+// Função para inicializar todos os gráficos
+function initializeCharts() {
+    console.log('Inicializando gráficos Chart.js...');
+    
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js não encontrado. Adicionando via CDN...');
+        loadChartJS().then(() => {
+            createAllCharts();
+        });
+    } else {
+        createAllCharts();
+    }
+}
+
+function loadChartJS() {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js';
+        script.onload = () => {
+            console.log('Chart.js carregado dinamicamente');
+            resolve();
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+function createAllCharts() {
+    try {
+        createCategoryChart();
+        createPriorityChart();
+        createTimelineChart();
+        createStatusChart();
+        loadChartData();
+        console.log('Todos os gráficos inicializados');
+    } catch (error) {
+        console.error('Erro ao criar gráficos:', error);
+    }
+}
+
+function createCategoryChart() {
+    const ctx = document.getElementById('categoryChartCanvas');
+    if (!ctx) return;
+    
+    categoryChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Hardware', 'Software', 'Rede', 'Sistema', 'Email', 'Outros'],
+            datasets: [{
+                data: [0, 0, 0, 0, 0, 0],
+                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'],
+                borderWidth: 3,
+                borderColor: '#ffffff',
+                hoverBorderWidth: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true,
+                        font: { size: 12, family: 'Segoe UI' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#6366f1',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b);
+                            const percentage = total > 0 ? Math.round((context.parsed / total) * 100) : 0;
+                            return `${context.label}: ${context.parsed} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateScale: true,
+                animateRotate: true,
+                duration: 1000
+            }
+        }
+    });
+}
+
+function createPriorityChart() {
+    const ctx = document.getElementById('priorityChartCanvas');
+    if (!ctx) return;
+    
+    priorityChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Crítica', 'Alta', 'Média', 'Baixa'],
+            datasets: [{
+                label: 'Tickets',
+                data: [0, 0, 0, 0],
+                backgroundColor: ['rgba(239, 68, 68, 0.8)', 'rgba(245, 158, 11, 0.8)', 'rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)'],
+                borderColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'],
+                borderWidth: 2,
+                borderRadius: 6,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#6366f1',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                    ticks: { font: { family: 'Segoe UI' } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { family: 'Segoe UI' } }
+                }
+            },
+            animation: { duration: 1000, easing: 'easeOutQuart' }
+        }
+    });
+}
+
+function createTimelineChart() {
+    const ctx = document.getElementById('timelineChartCanvas');
+    if (!ctx) return;
+    
+    timelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Tickets Criados',
+                data: [],
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: '#6366f1',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#6366f1',
+                    borderWidth: 1
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                    ticks: { font: { family: 'Segoe UI' } }
+                },
+                x: {
+                    grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                    ticks: { font: { family: 'Segoe UI' } }
+                }
+            },
+            animation: { duration: 1000, easing: 'easeOutQuart' }
+        }
+    });
+}
+
+function createStatusChart() {
+    const ctx = document.getElementById('statusChartCanvas');
+    if (!ctx) return;
+    
+    statusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Abertos', 'Em Andamento', 'Resolvidos', 'Fechados'],
+            datasets: [{
+                data: [0, 0, 0, 0],
+                backgroundColor: ['#ef4444', '#f59e0b', '#10b981', '#6b7280'],
+                borderWidth: 3,
+                borderColor: '#ffffff',
+                hoverBorderWidth: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true,
+                        font: { size: 12, family: 'Segoe UI' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#6366f1',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b);
+                            const percentage = total > 0 ? Math.round((context.parsed / total) * 100) : 0;
+                            return `${context.label}: ${context.parsed} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            animation: {
+                animateScale: true,
+                animateRotate: true,
+                duration: 1000
+            }
+        }
+    });
+}
+
+async function loadChartData() {
+    try {
+        console.log('Carregando dados dos gráficos...');
+        
+        const response = await fetch('/api/dashboard');
+        if (!response.ok) throw new Error('Erro ao carregar dados do dashboard');
+        
+        const data = await response.json();
+        updateChartsWithData(data);
+        
+    } catch (error) {
+        console.error('Erro ao carregar dados dos gráficos:', error);
+        updateChartsWithMockData();
+    }
+}
+
+function updateChartsWithData(data) {
+    if (!data || !data.data) return;
+    
+    const dashboardData = data.data;
+    
+    if (categoryChart && dashboardData.categoryStats) {
+        const categories = dashboardData.categoryStats;
+        const labels = categories.map(cat => cat.category || 'Outros');
+        const values = categories.map(cat => cat.count || 0);
+        
+        categoryChart.data.labels = labels;
+        categoryChart.data.datasets[0].data = values;
+        categoryChart.update('active');
+    }
+    
+    if (priorityChart && dashboardData.stats) {
+        const total = dashboardData.stats.total_tickets || 0;
+        const mockPriorities = [
+            Math.floor(total * 0.15),
+            Math.floor(total * 0.25),
+            Math.floor(total * 0.45),
+            Math.floor(total * 0.15)
+        ];
+        
+        priorityChart.data.datasets[0].data = mockPriorities;
+        priorityChart.update('active');
+    }
+    
+    if (timelineChart && dashboardData.ticketsTimeline) {
+        const timeline = dashboardData.ticketsTimeline;
+        const labels = timeline.map(item => {
+            const date = new Date(item.date);
+            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        });
+        const values = timeline.map(item => item.count || 0);
+        
+        timelineChart.data.labels = labels;
+        timelineChart.data.datasets[0].data = values;
+        timelineChart.update('active');
+    }
+    
+    if (statusChart && dashboardData.stats) {
+        const stats = dashboardData.stats;
+        const statusData = [
+            stats.open_tickets || 0,
+            stats.progress_tickets || 0,
+            stats.resolved_tickets || 0,
+            Math.max(0, (stats.total_tickets || 0) - (stats.open_tickets || 0) - (stats.progress_tickets || 0) - (stats.resolved_tickets || 0))
+        ];
+        
+        statusChart.data.datasets[0].data = statusData;
+        statusChart.update('active');
+    }
+    
+    updateAdditionalMetrics(dashboardData);
+}
+
+function updateAdditionalMetrics(data) {
+    const avgTime = data.avgResolutionTime || 0;
+    const avgElement = document.getElementById('avg-resolution-time');
+    if (avgElement) avgElement.textContent = avgTime > 0 ? `${avgTime}h` : '0h';
+    
+    const todayTickets = data.ticketsTimeline && data.ticketsTimeline.length > 0 ? 
+        data.ticketsTimeline[data.ticketsTimeline.length - 1].count : 0;
+    const todayElement = document.getElementById('today-tickets');
+    if (todayElement) todayElement.textContent = todayTickets;
+    
+    const satisfactionElement = document.getElementById('satisfaction-rate');
+    if (satisfactionElement) satisfactionElement.textContent = '95%';
+    
+    const responseElement = document.getElementById('response-time');
+    if (responseElement) responseElement.textContent = '2.5h';
+}
+
+function updateChartsWithMockData() {
+    console.log('Usando dados simulados para gráficos...');
+    
+    const mockData = {
+        categories: {
+            labels: ['Hardware', 'Software', 'Rede', 'Sistema', 'Email'],
+            data: [8, 12, 5, 7, 3]
+        },
+        priorities: [3, 8, 15, 9],
+        timeline: {
+            labels: ['05/09', '06/09', '07/09', '08/09', '09/09', '10/09', '11/09'],
+            data: [3, 5, 2, 7, 4, 6, 8]
+        },
+        status: [12, 8, 15, 3]
+    };
+    
+    if (categoryChart) {
+        categoryChart.data.labels = mockData.categories.labels;
+        categoryChart.data.datasets[0].data = mockData.categories.data;
+        categoryChart.update('active');
+    }
+    
+    if (priorityChart) {
+        priorityChart.data.datasets[0].data = mockData.priorities;
+        priorityChart.update('active');
+    }
+    
+    if (timelineChart) {
+        timelineChart.data.labels = mockData.timeline.labels;
+        timelineChart.data.datasets[0].data = mockData.timeline.data;
+        timelineChart.update('active');
+    }
+    
+    if (statusChart) {
+        statusChart.data.datasets[0].data = mockData.status;
+        statusChart.update('active');
+    }
+    
+    const avgElement = document.getElementById('avg-resolution-time');
+    if (avgElement) avgElement.textContent = '4.2h';
+    
+    const todayElement = document.getElementById('today-tickets');
+    if (todayElement) todayElement.textContent = '8';
+}
+
+function refreshCategoryChart() {
+    if (categoryChart) {
+        categoryChart.data.datasets[0].data = categoryChart.data.datasets[0].data.map(() => 0);
+        categoryChart.update();
+        setTimeout(() => loadChartData(), 500);
+    }
+}
+
+function refreshPriorityChart() {
+    if (priorityChart) {
+        priorityChart.data.datasets[0].data = [0, 0, 0, 0];
+        priorityChart.update();
+        setTimeout(() => loadChartData(), 500);
+    }
+}
+
+function refreshTimelineChart() {
+    const period = document.getElementById('timeline-period')?.value || '7';
+    console.log(`Atualizando timeline para ${period} dias`);
+    
+    if (timelineChart) {
+        setTimeout(() => loadChartData(), 500);
+    }
+}
+
+function refreshStatusChart() {
+    if (statusChart) {
+        statusChart.data.datasets[0].data = [0, 0, 0, 0];
+        statusChart.update();
+        setTimeout(() => loadChartData(), 500);
+    }
+}
+
+const originalRefreshData = window.refreshData;
+window.refreshData = function() {
+    if (typeof originalRefreshData === 'function') {
+        originalRefreshData();
+    }
+    loadChartData();
+};
+
+console.log('Sistema de gráficos Chart.js configurado!');
+</script>

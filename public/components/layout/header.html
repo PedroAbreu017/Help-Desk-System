@@ -1,0 +1,31 @@
+<!-- Header -->
+<header class="header">
+    <div class="header-content">
+        <div class="logo">
+            <i class="fas fa-headset"></i>
+            <h1>Help Desk Pro</h1>
+        </div>
+        <div class="header-actions">
+            <!-- Notification Center -->
+            <div class="notification-center" id="notification-center">
+                <i class="fas fa-bell"></i>
+                <span id="notification-badge" class="notification-badge">0</span>
+            </div>
+            
+            <!-- Connection Status -->
+            <div class="connection-info">
+                <span>Status</span>
+                <div id="connection-status" class="connection-status disconnected" title="WebSocket Desconectado"></div>
+                <span id="user-stats" class="user-stats"></span>
+            </div>
+            
+            <button class="btn-refresh" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> Atualizar
+            </button>
+            <div class="user-info">
+                <i class="fas fa-user-circle"></i>
+                <span>Suporte TI</span>
+            </div>
+        </div>
+    </div>
+</header>
