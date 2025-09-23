@@ -11,8 +11,21 @@ const { logger } = require('./src/middleware/logger');
 const { errorHandler } = require('./src/middleware/errorHandler');
 const { authenticateToken } = require('./src/middleware/auth');
 
+<<<<<<< HEAD
 // Configuração do banco de dados
 const { initDatabase, executeQuery } = require('./src/config/database');
+=======
+// Middleware de segurança e logs
+app.use(helmet({
+    contentSecurityPolicy: false, // Desabilitar para desenvolvimento
+    crossOriginEmbedderPolicy: false
+}));
+app.use(morgan('combined'));
+app.use(cors({
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+>>>>>>> b04799c092ae4d0aefb96551a895a12bf0624af2
 
 // Routes
 const authRoutes = require('./src/routes/auth');
@@ -114,6 +127,7 @@ function createApp() {
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+<<<<<<< HEAD
     // Logging
     if (process.env.NODE_ENV !== 'test') {
         app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
@@ -217,3 +231,7 @@ if (require.main === module) {
 }
 
 module.exports = { startServer, createApp };
+=======
+// Iniciar o servidor
+startServer();
+>>>>>>> b04799c092ae4d0aefb96551a895a12bf0624af2
