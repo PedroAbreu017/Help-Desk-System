@@ -1,4 +1,4 @@
-// main.js - Arquivo principal COMPATÍVEL com sistema modular + Chart.js + ReportsManager
+// main.js - Arquivo principal COMPATÍVEL com sistema modular + Chart.js + ReportsManager + Admin Panel
 class HelpDeskApp {
     constructor() {
         this.currentSection = 'dashboard';
@@ -23,6 +23,9 @@ class HelpDeskApp {
         
         // Initialize ReportsManager if available
         this.initializeReportsManager();
+        
+        // NOVO: Setup admin panel integration
+        this.setupAdminIntegration();
         
         // Hide loading
         this.hideLoading();
@@ -77,6 +80,111 @@ class HelpDeskApp {
         });
         const activeNav = document.querySelector(`[data-section="${this.currentSection}"]`);
         if (activeNav) activeNav.classList.add('active');
+    }
+
+    // NOVO: Setup admin panel integration
+    setupAdminIntegration() {
+        // Aguardar um pouco para auth manager estar pronto
+        setTimeout(() => {
+            this.updateUIForUserRole();
+            
+            // Escutar mudanças no usuário
+            document.addEventListener('user-changed', () => {
+                this.updateUIForUserRole();
+            });
+            
+            // Escutar quando sistema modular estiver pronto
+            document.addEventListener('modularSystemReady', () => {
+                this.updateUIForUserRole();
+            });
+            
+        }, 1000);
+    }
+
+    // NOVO: Atualizar UI baseada no role do usuário
+    updateUIForUserRole() {
+        const user = window.authManager?.getCurrentUser();
+        console.log('🔐 Atualizando UI para role:', user?.role);
+        
+        const adminOnlyElements = document.querySelectorAll('.admin-only');
+        const userInfo = document.querySelector('.user-details, .user-info');
+        
+        if (user && user.role === 'admin') {
+            // Mostrar elementos admin
+            adminOnlyElements.forEach(el => {
+                el.style.display = 'block';
+                el.classList.add('admin-visible');
+            });
+            
+            // Atualizar info do usuário
+            this.updateUserDisplay(user, 'Administrador');
+            
+            console.log('✅ Elementos admin habilitados');
+            
+            // Mostrar notificação de acesso admin (apenas uma vez)
+            if (!sessionStorage.getItem('admin-welcome-shown')) {
+                setTimeout(() => {
+                    this.showNotification('Acesso administrativo habilitado', 'success');
+                    sessionStorage.setItem('admin-welcome-shown', 'true');
+                }, 1500);
+            }
+            
+        } else {
+            // Ocultar elementos admin
+            adminOnlyElements.forEach(el => {
+                el.style.display = 'none';
+                el.classList.remove('admin-visible');
+            });
+            
+            // Atualizar info do usuário
+            if (user) {
+                const roleDisplay = {
+                    'technician': 'Técnico',
+                    'user': 'Usuário'
+                };
+                this.updateUserDisplay(user, roleDisplay[user.role] || 'Usuário');
+            }
+            
+            // Se estiver na seção admin, voltar para dashboard
+            if (this.currentSection === 'admin-panel') {
+                this.showSection('dashboard');
+            }
+            
+            console.log('🚫 Elementos admin ocultos');
+        }
+        
+        // Salvar usuário atual globalmente
+        window.currentUser = user;
+    }
+
+    // NOVO: Atualizar display do usuário na sidebar/header
+    updateUserDisplay(user, roleDisplay) {
+        const userNameElements = document.querySelectorAll('.user-name, .user-info span');
+        const userRoleElements = document.querySelectorAll('.user-role');
+        
+        userNameElements.forEach(el => {
+            if (el) el.textContent = user.name || 'Usuário';
+        });
+        
+        userRoleElements.forEach(el => {
+            if (el) {
+                el.textContent = roleDisplay;
+                // Adicionar classe baseada no role
+                el.className = `user-role role-${user.role}`;
+            }
+        });
+        
+        // Criar elemento de role se não existir
+        if (userRoleElements.length === 0) {
+            const userInfo = document.querySelector('.user-details, .user-info');
+            if (userInfo && !userInfo.querySelector('.user-role')) {
+                const roleSpan = document.createElement('span');
+                roleSpan.className = `user-role role-${user.role}`;
+                roleSpan.textContent = roleDisplay;
+                roleSpan.style.cssText = 'font-size: 0.8em; opacity: 0.8; display: block;';
+                userInfo.appendChild(roleSpan);
+            }
+        }
     }
 
     async loadInitialData() {
@@ -478,7 +586,17 @@ class HelpDeskApp {
         badge.style.display = openTickets > 0 ? 'inline' : 'none';
     }
 
+    // MODIFICADO: Adicionar verificação de acesso admin
     showSection(sectionName) {
+        // NOVO: Verificar acesso admin
+        if (sectionName === 'admin-panel') {
+            const currentUser = window.currentUser || (window.authManager && window.authManager.getCurrentUser());
+            if (!currentUser || currentUser.role !== 'admin') {
+                this.showNotification('Acesso negado: apenas administradores', 'error');
+                return;
+            }
+        }
+
         // Hide all sections
         document.querySelectorAll('.content-section').forEach(section => {
             section.classList.remove('active');
@@ -508,6 +626,11 @@ class HelpDeskApp {
             }
         } else if (sectionName === 'reports') {
             this.loadReports();
+        } else if (sectionName === 'admin-panel') {
+            // NOVO: Refresh admin stats se necessário
+            if (window.adminManager && typeof window.adminManager.refresh === 'function') {
+                setTimeout(() => window.adminManager.refresh(), 500);
+            }
         }
     }
 
@@ -530,41 +653,21 @@ class HelpDeskApp {
         }
     }
 
-    showToast(message, type = 'info') {
-        // Usar o toast do authManager se disponível
+    // MODIFICADO: Usar showNotification em vez de showToast para consistência
+    showNotification(message, type = 'info') {
+        // Usar o método do authManager se disponível
         if (window.authManager && window.authManager.showToast) {
             window.authManager.showToast(message, type);
             return;
         }
 
-        // Fallback para console se não tiver toast container
-        const container = document.getElementById('toast-container');
-        if (!container) {
-            console.log(`${type.toUpperCase()}: ${message}`);
-            return;
-        }
+        // Fallback para console se não tiver sistema de notificação
+        console.log(`${type.toUpperCase()}: ${message}`);
+    }
 
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.innerHTML = `
-            <div class="toast-content">
-                <i class="fas fa-${this.getToastIcon(type)}"></i>
-                <span>${message}</span>
-            </div>
-            <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-        `;
-
-        container.appendChild(toast);
-
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            if (toast.parentElement) {
-                toast.remove();
-            }
-        }, 5000);
-
-        // Animate in
-        setTimeout(() => toast.classList.add('show'), 100);
+    showToast(message, type = 'info') {
+        // Alias para showNotification para compatibilidade
+        this.showNotification(message, type);
     }
 
     renderKnowledgeBase(filter = 'all') {
@@ -627,7 +730,7 @@ class HelpDeskApp {
             const result = await response.json();
 
             if (result.success) {
-                this.showToast('Ticket criado com sucesso!', 'success');
+                this.showNotification('Ticket criado com sucesso!', 'success');
                 e.target.reset();
                 await this.loadTickets();
                 await this.loadDashboardData();
@@ -638,7 +741,7 @@ class HelpDeskApp {
 
         } catch (error) {
             console.error('❌ Erro ao criar ticket:', error);
-            this.showToast('Erro ao criar ticket: ' + error.message, 'error');
+            this.showNotification('Erro ao criar ticket: ' + error.message, 'error');
         } finally {
             this.hideLoading();
         }
@@ -726,7 +829,7 @@ class HelpDeskApp {
     }
 
     async loadReports() {
-        // Implementar se necessário
+        
     }
 }
 
@@ -762,4 +865,11 @@ window.refreshTimelineChart = () => {
     if (window.app) window.app.refreshDashboard();
 };
 
-console.log('📦 Main.js com ReportsManager Integration carregado!');
+// NOVO: Função global para logout
+window.logout = () => {
+    if (window.authManager && confirm('Deseja realmente sair do sistema?')) {
+        window.authManager.logout();
+    }
+};
+
+console.log('📦 Main.js com ReportsManager e Admin Panel Integration carregado!');

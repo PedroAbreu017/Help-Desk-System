@@ -1,4 +1,4 @@
-// server.js - Help Desk System com WebSocket
+// server.js - Help Desk System com WebSocket e Admin Panel
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -11,21 +11,8 @@ const { logger } = require('./src/middleware/logger');
 const { errorHandler } = require('./src/middleware/errorHandler');
 const { authenticateToken } = require('./src/middleware/auth');
 
-<<<<<<< HEAD
 // Configuração do banco de dados
 const { initDatabase, executeQuery } = require('./src/config/database');
-=======
-// Middleware de segurança e logs
-app.use(helmet({
-    contentSecurityPolicy: false, // Desabilitar para desenvolvimento
-    crossOriginEmbedderPolicy: false
-}));
-app.use(morgan('combined'));
-app.use(cors({
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
->>>>>>> b04799c092ae4d0aefb96551a895a12bf0624af2
 
 // Routes
 const authRoutes = require('./src/routes/auth');
@@ -34,6 +21,7 @@ const usersRoutes = require('./src/routes/users');
 const dashboardRoutes = require('./src/routes/dashboard');
 const reportsRoutes = require('./src/routes/reports');
 const knowledgeBaseRoutes = require('./src/routes/knowledge-base');
+const adminRoutes = require('./src/routes/admin'); // Admin Panel
 
 // WebSocket configuration
 console.log('🔍 Tentando importar socket config...');
@@ -65,14 +53,14 @@ async function startServer() {
         
         // Inicializar WebSocket
         if (initializeSocket) {
-        console.log('🔌 Configurando WebSocket...');
-        const { io, notificationService } = initializeSocket(server);
-        console.log('✅ WebSocket configurado');
+            console.log('🔌 Configurando WebSocket...');
+            const { io, notificationService } = initializeSocket(server);
+            console.log('✅ WebSocket configurado');
         }
         
         // Iniciar servidor
         const PORT = process.env.PORT || 3000;
-        server.listen(PORT, () => {
+        server.listen(PORT, '0.0.0.0', () => {
             console.log('');
             console.log('🎉 ================================');
             console.log('✅ HELP DESK SYSTEM ONLINE! v2.0');
@@ -81,6 +69,7 @@ async function startServer() {
             console.log(`🌐 Servidor: http://localhost:${PORT}`);
             console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
             console.log(`💚 Health: http://localhost:${PORT}/health`);
+            console.log(`🛡️  Admin Panel: http://localhost:${PORT} (login como admin)`);
             console.log('');
         });
         
@@ -96,22 +85,26 @@ async function startServer() {
 function createApp() {
     const app = express();
 
-    // Configurar CORS
+    // Configurar CORS para produção
+    const allowedOrigins = process.env.NODE_ENV === 'production' 
+        ? ['https://your-render-url.onrender.com'] 
+        : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
     app.use(cors({
-        origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://127.0.0.1:3000'],
+        origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : allowedOrigins,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization']
     }));
 
-    // Security headers (CSP CORRIGIDO para desenvolvimento)
+    // Security headers
     app.use(helmet({
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
                 styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
                 scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdnjs.cloudflare.com"],
-                scriptSrcAttr: ["'unsafe-inline'"], // ADICIONADO para eventos onclick
+                scriptSrcAttr: ["'unsafe-inline'"],
                 imgSrc: ["'self'", "data:", "https:"],
                 connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
                 fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
@@ -127,7 +120,6 @@ function createApp() {
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-<<<<<<< HEAD
     // Logging
     if (process.env.NODE_ENV !== 'test') {
         app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
@@ -144,11 +136,16 @@ function createApp() {
             version: '2.0.0',
             environment: process.env.NODE_ENV || 'development',
             websocket: !!global.io ? 'connected' : 'disconnected',
-            database: 'connected' // Assumindo que chegou até aqui, DB está OK
+            database: 'connected',
+            admin_panel: 'enabled'
         });
     });
 
-    // API Routes
+    // API Routes - TODAS AS ROTAS DENTRO DA FUNÇÃO createApp()
+    console.log('🛡️ Registrando rotas admin...');
+    app.use('/api/admin', adminRoutes); // Admin routes (já tem auth interno)
+    console.log('✅ Rotas admin registradas');
+    
     app.use('/api/auth', authRoutes);
     app.use('/api/tickets', authenticateToken, ticketsRoutes);
     app.use('/api/users', authenticateToken, usersRoutes);
@@ -231,7 +228,3 @@ if (require.main === module) {
 }
 
 module.exports = { startServer, createApp };
-=======
-// Iniciar o servidor
-startServer();
->>>>>>> b04799c092ae4d0aefb96551a895a12bf0624af2

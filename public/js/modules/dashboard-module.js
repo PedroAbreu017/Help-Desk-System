@@ -1,6 +1,24 @@
 // public/js/modules/dashboard-module.js
 // Módulo que MELHORA o dashboard existente sem substituí-lo
+// Aguardar BaseModule estar disponível
+function waitForBaseModule() {
+    return new Promise((resolve) => {
+        if (typeof BaseModule !== 'undefined') {
+            resolve();
+            return;
+        }
+        
+        const checkInterval = setInterval(() => {
+            if (typeof BaseModule !== 'undefined') {
+                clearInterval(checkInterval);
+                resolve();
+            }
+        }, 100);
+    });
+}
 
+// Definir classe após BaseModule estar disponível
+waitForBaseModule().then(() => {
 class DashboardModule extends BaseModule {
   constructor() {
     super('dashboard', {
@@ -346,3 +364,4 @@ if (typeof window.BaseModule !== 'undefined') {
 } else {
   console.warn('[DashboardModule] BaseModule não encontrado, módulo não carregado');
 }
+});

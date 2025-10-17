@@ -1,8 +1,9 @@
-// component-loader.js - VERSÃO FINAL CORRIGIDA COM REPORTS
+// component-loader.js - COM SISTEMA DE DELEGAÇÃO DE MÓDULOS E ADMIN PANEL
 class ComponentLoader {
     constructor() {
         this.components = new Map();
         this.loadedComponents = new Set();
+        this.modules = new Map(); // Registro de módulos
         this.baseUrl = '/components/';
     }
 
@@ -12,6 +13,97 @@ class ComponentLoader {
             container: container || `[data-component="${name}"]`,
             loaded: false
         });
+    }
+
+    // NOVO: Registrar módulos para delegação
+    registerModule(name, moduleInstance, responsibilities = []) {
+        this.modules.set(name, {
+            instance: moduleInstance,
+            responsibilities: responsibilities, // ['editTicket', 'viewTicket', etc]
+            ready: false
+        });
+        console.log(`🔌 Módulo ${name} registrado com responsabilidades:`, responsibilities);
+    }
+
+    // NOVO: Marcar módulo como pronto
+    markModuleReady(name) {
+        const module = this.modules.get(name);
+        if (module) {
+            module.ready = true;
+            console.log(`✅ Módulo ${name} pronto para delegação`);
+            this.setupDelegation();
+        }
+    }
+
+    // NOVO: Configurar sistema de delegação
+    setupDelegation() {
+        // Configurar delegação para tickets
+        this.setupTicketsDelegation();
+        // Configurar delegação para admin (se necessário no futuro)
+        this.setupAdminDelegation();
+    }
+
+    // NOVO: Configurar delegação específica para tickets
+    setupTicketsDelegation() {
+        const ticketsModule = this.modules.get('tickets');
+        
+        if (!ticketsModule?.ready) return;
+
+        // Configurar delegação no main.js se existir
+        if (window.app && typeof window.app === 'object') {
+            // Salvar métodos originais se existirem
+            const originalMethods = {};
+            
+            const methodsToDelegate = ['editTicket', 'viewTicket', 'showTicketDetails', 'deleteTicket'];
+            
+            methodsToDelegate.forEach(methodName => {
+                if (typeof window.app[methodName] === 'function') {
+                    originalMethods[methodName] = window.app[methodName].bind(window.app);
+                }
+                
+                // Substituir por delegação
+                window.app[methodName] = (...args) => {
+                    console.log(`🔗 Delegando ${methodName} para tickets-module`);
+                    
+                    if (window.ticketsModule && typeof window.ticketsModule[methodName] === 'function') {
+                        return window.ticketsModule[methodName](...args);
+                    }
+                    
+                    // Fallback para método original
+                    if (originalMethods[methodName]) {
+                        console.log(`⚠️ Usando fallback para ${methodName}`);
+                        return originalMethods[methodName](...args);
+                    }
+                    
+                    console.warn(`❌ Método ${methodName} não encontrado`);
+                };
+            });
+            
+            console.log('🎯 Delegação de tickets configurada no main.js');
+        }
+    }
+
+    // NOVO: Configurar delegação específica para admin
+    setupAdminDelegation() {
+        const adminModule = this.modules.get('admin');
+        
+        if (!adminModule?.ready) return;
+
+        // Configurar delegação admin se necessário
+        if (window.app && typeof window.app === 'object') {
+            const adminMethods = ['showAdminPanel', 'refreshAdminStats', 'manageUsers'];
+            
+            adminMethods.forEach(methodName => {
+                if (window.adminManager && typeof window.adminManager[methodName] === 'function') {
+                    window.app[methodName] = (...args) => {
+                        console.log(`🔗 Delegando ${methodName} para admin-module`);
+                        return window.adminManager[methodName](...args);
+                    };
+                }
+            });
+            
+            console.log('🎯 Delegação de admin configurada no main.js');
+        }
     }
 
     async loadComponent(name) {
@@ -43,6 +135,12 @@ class ComponentLoader {
                 
                 this.loadedComponents.add(name);
                 console.log(`✅ Componente ${name} carregado`);
+                
+                // Se for admin-panel, marcar módulo como carregado
+                if (name === 'admin-panel') {
+                    console.log('🛡️ Admin Panel carregado - aguardando inicialização...');
+                }
+                
                 return true;
             } else {
                 console.warn(`Container ${component.container} não encontrado para ${name}`);
@@ -92,6 +190,7 @@ class ComponentLoader {
         this.registerComponent('new-ticket', 'sections/new-ticket.html', '[data-component="new-ticket"]');
         this.registerComponent('reports', 'sections/reports.html', '[data-component="reports"]');
         this.registerComponent('knowledge-base', 'sections/knowledge-base.html', '[data-component="knowledge-base"]');
+        this.registerComponent('admin-panel', 'sections/admin-panel.html', '[data-component="admin-panel"]'); // NOVO
 
         // Modal components
         this.registerComponent('ticket-modal', 'modals/ticket-modal.html', '[data-component="ticket-modal"]');
@@ -104,7 +203,7 @@ class ComponentLoader {
     }
 }
 
-// Sistema Modular Principal
+// Sistema Modular Principal - COM DETECÇÃO DE MÓDULOS E ADMIN
 class ModularSystem {
     constructor() {
         this.loader = new ComponentLoader();
@@ -128,9 +227,9 @@ class ModularSystem {
             console.log('📦 Carregando layout...');
             await this.loader.loadComponents(['header', 'sidebar']);
 
-            // Carregar seções
+            // Carregar seções (incluindo admin-panel)
             console.log('📦 Carregando seções...');  
-            await this.loader.loadComponents(['dashboard', 'tickets', 'new-ticket', 'reports', 'knowledge-base']);
+            await this.loader.loadComponents(['dashboard', 'tickets', 'new-ticket', 'reports', 'knowledge-base', 'admin-panel']);
 
             // Carregar modais
             console.log('📦 Carregando modais...');
@@ -161,8 +260,11 @@ class ModularSystem {
             console.log('📦 Carregando scripts finais...');
             await this.loader.loadComponents(['footer-scripts']);
 
+            // AGUARDAR MÓDULOS CARREGAREM E CONFIGURAR DELEGAÇÃO
+            await this.waitForModulesAndSetupDelegation();
+
             this.initialized = true;
-            console.log('✅ Sistema Modular inicializado!');
+            console.log('✅ Sistema Modular inicializado com Admin Panel!');
             
             return true;
 
@@ -170,6 +272,54 @@ class ModularSystem {
             console.error('❌ Erro na inicialização:', error);
             return true;
         }
+    }
+
+    // NOVO: Aguardar módulos e configurar delegação
+    async waitForModulesAndSetupDelegation() {
+        console.log('🔍 Aguardando módulos carregarem...');
+        
+        // Aguardar um tempo para scripts carregarem
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Verificar e registrar módulos disponíveis
+        this.detectAndRegisterModules();
+        
+        // Aguardar mais um pouco para módulos se inicializarem
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Marcar módulos como prontos
+        this.markModulesReady();
+    }
+
+    // MODIFICADO: Detectar e registrar módulos automaticamente (incluindo admin)
+    detectAndRegisterModules() {
+        // Detectar tickets module
+        if (window.ticketsModule || window.TicketsModule) {
+            const instance = window.ticketsModule || window.TicketsModule;
+            this.loader.registerModule('tickets', instance, ['editTicket', 'viewTicket', 'showTicketDetails', 'deleteTicket']);
+        }
+        
+        // Detectar dashboard module
+        if (window.dashboardModule || window.DashboardModule) {
+            const instance = window.dashboardModule || window.DashboardModule;
+            this.loader.registerModule('dashboard', instance, ['refreshDashboard']);
+        }
+
+        // NOVO: Detectar admin module
+        if (window.adminManager || window.AdminManager) {
+            const instance = window.adminManager || window.AdminManager;
+            this.loader.registerModule('admin', instance, ['showAdminPanel', 'refreshAdminStats', 'manageUsers']);
+            console.log('🛡️ Admin Manager detectado e registrado');
+        }
+    }
+
+    // NOVO: Marcar módulos como prontos
+    markModulesReady() {
+        this.loader.modules.forEach((module, name) => {
+            if (module.instance) {
+                this.loader.markModuleReady(name);
+            }
+        });
     }
 
     isReady() {
@@ -192,7 +342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Aguardar todos os scripts carregarem e inicializarem
         console.log('⏳ Aguardando inicialização dos scripts...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Verificar se main.js foi carregado e inicializar se necessário
         if (typeof window.app === 'undefined') {
@@ -244,7 +394,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }, 500);
 
-        console.log('🎉 Sistema totalmente pronto para uso!');
+        console.log('🎉 Sistema totalmente pronto para uso com Admin Panel!');
 
     } catch (error) {
         console.error('❌ Erro crítico na inicialização:', error);
@@ -259,17 +409,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = '/index-backup.html';
     }
 });
-
-// Função de debug para verificar estado
-window.debugModularSystem = function() {
-    console.log('🔍 Estado do Sistema Modular:');
-    console.log('Inicializado:', window.modularSystem?.initialized);
-    console.log('Componentes carregados:', window.modularSystem?.loader?.loadedComponents);
-    console.log('App principal:', typeof window.app);
-    console.log('Chart.js:', typeof Chart);
-    console.log('ReportsManager:', typeof ReportsManager);
-    console.log('window.reportsManager:', typeof window.reportsManager);
-};
 
 // Inicialização de módulos específicos com timing adequado para sistema modular
 setTimeout(() => {
@@ -292,13 +431,41 @@ setTimeout(() => {
             }
         }, 500);
     }
+
+    // NOVO: Inicializar AdminManager se existir
+    if (typeof AdminManager !== 'undefined' && !window.adminManager && document.getElementById('admin-panel-section')) {
+        try {
+            window.adminManager = new AdminManager();
+            console.log('🛡️ AdminManager inicializado pelo component-loader');
+        } catch (error) {
+            console.error('❌ Erro ao inicializar AdminManager:', error);
+        }
+    }
+    
+    // NOVA DETECÇÃO E CONFIGURAÇÃO DE DELEGAÇÃO (incluindo admin)
+    console.log('🔍 Detectando módulos para delegação...');
+    window.modularSystem.detectAndRegisterModules();
+    window.modularSystem.markModulesReady();
     
     // Log final do status
     console.log('🎯 Status final dos módulos:');
     console.log('- HelpDeskApp:', typeof window.app);
     console.log('- ReportsManager:', typeof window.reportsManager);
     console.log('- AuthManager:', typeof window.authManager);
+    console.log('- TicketsModule:', typeof window.ticketsModule);
+    console.log('- AdminManager:', typeof window.adminManager);
     
-}, 3500); // Tempo aumentado para 3.5s para garantir que todos os scripts carreguem
+}, 4000); // Tempo para garantir que todos os módulos carreguem
 
-console.log('📦 Component Loader FINAL carregado com ReportsManager - v2.0!');
+// Função de debug para verificar estado
+window.debugModularSystem = function() {
+    console.log('🔍 Estado do Sistema Modular:');
+    console.log('Inicializado:', window.modularSystem?.initialized);
+    console.log('Componentes carregados:', window.modularSystem?.loader?.loadedComponents);
+    console.log('Módulos registrados:', window.modularSystem?.loader?.modules);
+    console.log('App principal:', typeof window.app);
+    console.log('TicketsModule:', typeof window.ticketsModule);
+    console.log('AdminManager:', typeof window.adminManager);
+};
+
+console.log('📦 Component Loader com Sistema de Delegação e Admin Panel carregado - v3.1!');
